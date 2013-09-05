@@ -75,11 +75,13 @@ camera.Camera = function() {
   this.synchronizeBounds_();
 
   // Prepare effect previews.
-  for (var i = 0; i < 3; i++) {
-    this.addEffect_(new camera.effects.Andy());
-    this.addEffect_(new camera.effects.Swirl());
-    this.addEffect_(new camera.effects.Pinch());
-  }
+  this.addEffect_(new camera.effects.Andy());
+  this.addEffect_(new camera.effects.Swirl());
+  this.addEffect_(new camera.effects.Pinch());
+  this.addEffect_(new camera.effects.Grayscale());
+  this.addEffect_(new camera.effects.Sepia());
+  this.addEffect_(new camera.effects.Colorize());
+  this.addEffect_(new camera.effects.Newspaper());
 
   // Handle key presses to make the Camera app accessible via the keyboard.
   document.body.addEventListener('keydown', this.onKeyPressed_.bind(this));

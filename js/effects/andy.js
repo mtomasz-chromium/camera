@@ -22,7 +22,7 @@ camera.effects.Andy.prototype = {
 };
 
 camera.effects.Andy.prototype.filterFrame = function(canvas) {
-  canvas.ink(4.0);
+  canvas.bulgePinch(canvas.width / 2, canvas.height / 2, canvas.width / 10, -1);
 };
 
 camera.effects.Andy.prototype.getTitle = function() {
