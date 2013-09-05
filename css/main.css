@@ -1,0 +1,193 @@
+body {
+  background-color: black;
+  -webkit-box-align: center;
+  bottom: 0;
+  display: -webkit-box;
+  left: 0;
+  margin: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+#header {
+  -webkit-app-region: drag;
+  padding: 8px;
+  position: absolute;
+  pointer-events: auto;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: -webkit-box;
+  -webkit-box-pack: end;
+}
+
+#header button {
+  -webkit-app-region: no-drag;
+  background-color: rgba(0, 0, 0, 0.75);
+  opacity: 0;
+  transition: opacity 200ms linear;
+  padding: 0;
+  border: none;
+  height: 32px;
+  width: 32px;
+  margin: 0 2px;
+}
+
+body.expanded #header button {
+  opacity: 1;
+}
+
+#header #maximize {
+  background-image: -webkit-image-set(
+      url('../images/topbar_button_maximize.png') 1x,
+      url('../images/2x/topbar_button_maximize.png') 2x);
+}
+
+#header #close {
+  background-image: -webkit-image-set(
+      url('../images/topbar_button_close.png') 1x,
+      url('../images/2x/topbar_button_close.png') 2x);
+}
+
+#canvas-wrapper,
+#canvas-wrapper canvas {
+  width: 100%;
+}
+
+#effects {
+  display: -webkit-box;
+  list-style-type: none;
+  margin: 0;
+  padding: 0 0 5px;
+  overflow: auto;
+}
+
+::-webkit-scrollbar {
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: gray;
+  border-radius: 4px;
+}
+
+#effects li {
+  -webkit-margin-end: 10px;
+  -webkit-box-orient: vertical;
+  -webkit-box-align: center;
+  -webkit-box-pack: center;
+  display: -webkit-box;
+  padding: 0;
+}
+
+#effects li div.preview-canvas-wrapper {
+  border: 2px solid transparent;
+}
+
+#effects li[selected] div.preview-canvas-wrapper {
+  border: 2px solid #4d90fe;
+}
+
+#effects li canvas {
+  display: -webkit-box;
+  width: 80px;
+  height: 80px;
+  background-color: white;
+}
+
+#effects li span {
+  -webkit-padding-before: 5px;
+  color: white;
+  display: -webkit-box;
+}
+
+#buttons {
+  display: -webkit-box;
+  -webkit-box-align: center;
+  -webkit-box-pack: center;
+  margin-top: 5px;
+}
+
+#buttons button {
+  box-shadow: inset 0px -1px 6px 0px #edb9b9;
+  background: -webkit-gradient(linear, left top, left bottom,
+                               color-stop(0.05, #ff0000),
+                               color-stop(1, #d10f0f));
+  background-color: #ff0000;
+  border-radius: 39px;
+  border: 3px solid #000000;
+  color: white;
+  font-weight: bold;
+  height: 39px;
+  min-width: 60px;
+  padding: 0 15px;
+}
+
+#toolbar {
+  background-color: rgba(0, 0, 0, 0.75);
+  bottom: -200px;
+  left: 0;
+  padding: 10px;
+  position: absolute;
+  right: 0;
+  transition: bottom 200ms linear;
+}
+
+body.expanded #toolbar {
+  bottom: 0;
+}
+
+#shutter {
+  background-color: white;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  right: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 50ms linear;
+  top: 0;
+}
+
+body.show-shutter #shutter {
+  opacity: 1;
+}
+
+#picture-preview {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  position: absolute;
+  pointer-events: none;
+  display: -webkit-box;
+  -webkit-box-align: center;
+  -webkit-box-pack: center;
+}
+
+#picture-preview img {
+  border: 6px solid white;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+  display: -webkit-box;
+  width: 50%;
+  opacity: 0;
+  -webkit-animation: animatePicture 2s;
+}
+
+@-webkit-keyframes animatePicture {
+  10% {
+    opacity: 1;
+  }
+  90%{
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+

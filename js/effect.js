@@ -11,6 +11,9 @@ camera.Effect = function(tracker) {
   this.tracker_ = tracker;
 };
 
+camera.Effect.prototype.randomize = function() {
+};
+
 camera.Effect.prototype.filterFrame = function(canvas) {
 };
 

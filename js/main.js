@@ -16,6 +16,13 @@ camera.Camera = function() {
   this.video_ = document.createElement('video');
 
   /**
+   * Shutter sound player.
+   * @type {Audio}
+   * @private
+   */
+  this.shutterSound_ = document.createElement('audio');
+
+  /**
    * Canvas element with the current frame downsampled to small resolution, to
    * be used in effect preview windows.
    *
@@ -52,13 +59,24 @@ camera.Camera = function() {
   this.previewProcessors_ = [];
 
   /**
-   *
+   * Selected effect or null if no effect.
+   * @type {number}
    */
-  this.currentEffectIndex_ = null;
+  this.currentEffectIndex_ = 0;
 
+  /**
+   * Current frame.
+   * @type {number}
+   * @private
+   */
   this.frame_ = 0;
 
+  this.expanded_ = false;
+  this.expandingOrCollapsing_ = false;
+
   this.collapseTimer_ = null;
+  this.collapsingTimer_ = null;
+  this.expandingTimer_ = null;
 
   // Insert the main canvas to its container.
   this.mainCanvas_.id = 'canvas';
@@ -75,6 +93,7 @@ camera.Camera = function() {
   this.synchronizeBounds_();
 
   // Prepare effect previews.
+  this.addEffect_(new camera.effects.Normal());
   this.addEffect_(new camera.effects.Andy());
   this.addEffect_(new camera.effects.Swirl());
   this.addEffect_(new camera.effects.Pinch());
@@ -82,14 +101,25 @@ camera.Camera = function() {
   this.addEffect_(new camera.effects.Sepia());
   this.addEffect_(new camera.effects.Colorize());
   this.addEffect_(new camera.effects.Newspaper());
+  this.addEffect_(new camera.effects.TiltShift());
+  this.addEffect_(new camera.effects.Vintage());
+
+  // Select the default effect.
+  this.setCurrentEffect_(0);
 
   // Handle key presses to make the Camera app accessible via the keyboard.
   document.body.addEventListener('keydown', this.onKeyPressed_.bind(this));
   document.body.addEventListener(
       'mousemove', this.setExpanded_.bind(this, true));
+  document.body.addEventListener(
+      'click', this.setExpanded_.bind(this, true));
 
-  // Show tools.
-  this.setExpanded_(true);
+  // Make the preview ribbon possible to scroll by dragging with mouse.
+  document.querySelector('#effects').addEventListener(
+      'mousemove', this.onRibbonMouseMove_.bind(this));
+
+  // Load the shutter sound.
+  this.shutterSound_.src = '../sounds/shutter.wav';
 };
 
 camera.Camera.prototype.addEffect_ = function(effect) {
@@ -111,9 +141,6 @@ camera.Camera.prototype.addEffect_ = function(effect) {
   item.id = 'effect-' + effectIndex;
 
   // Assign events.
-  // item.addEventListener('mouseover',
-  //     this.setPreviewEffect_.bind(this, effectIndex));
-  // item.addEventListener('mouseout', this.setPreviewEffect_.bind(this, null));
   item.addEventListener('click',
       this.setCurrentEffect_.bind(this, effectIndex));
   document.querySelector('#take-picture').addEventListener(
@@ -126,21 +153,15 @@ camera.Camera.prototype.addEffect_ = function(effect) {
   this.previewProcessors_.push(processor);
 };
 
-camera.Camera.prototype.setPreviewEffect_ = function(effectIndex) {
-  var processor = this.previewProcessors_[
-    effectIndex !== null ? effectIndex : this.currentEffectIndex_];
-  this.mainProcessor_.effect = processor ? processor.effect : null;
-};
-
 camera.Camera.prototype.setCurrentEffect_ = function(effectIndex) {
-  if (this.currentEffectIndex_ !== null) {
-    document.querySelector('#effects #effect-' + this.currentEffectIndex_).
-        removeAttribute('selected');
-  }
+  document.querySelector('#effects #effect-' + this.currentEffectIndex_).
+      removeAttribute('selected');
   document.querySelector('#effects #effect-' + effectIndex).setAttribute(
       'selected', '');
+  if (this.currentEffectIndex_ == effectIndex)
+    this.previewProcessors_[effectIndex].effect.randomize();
+  this.mainProcessor_.effect = this.previewProcessors_[effectIndex].effect;
   this.currentEffectIndex_ = effectIndex;
-  this.setPreviewEffect_(null);
 };
 
 camera.Camera.prototype.onKeyPressed_ = function(event) {
@@ -160,7 +181,18 @@ camera.Camera.prototype.onKeyPressed_ = function(event) {
     case 'End':
       this.setCurrentEffect_(this.previewProcessors_.length - 1);
       break;
+    case 'Enter':
+    case 'U+0020':
+      this.takePicture_();
+      break;
   }
+};
+
+camera.Camera.prototype.onRibbonMouseMove_ = function(event) {
+  if (event.which != 1)
+    return;
+  var ribbon = document.querySelector('#effects');
+  ribbon.scrollLeft = parseInt(ribbon.scrollLeft) - event.webkitMovementX;
 };
 
 camera.Camera.prototype.setExpanded_ = function(expanded) {
@@ -168,23 +200,54 @@ camera.Camera.prototype.setExpanded_ = function(expanded) {
     clearTimeout(this.collapseTimer_);
     this.collapseTimer_ = null;
   }
+  if (this.collapsingTimer_) {
+    clearTimeout(this.collapsingTimer_);
+    this.collapsingTimer_ = null;
+  }
+  if (this.expandingTimer_) {
+    clearTimeout(this.expandingTimer_);
+    this.expandingTimer_ = null;
+  }
   if (expanded) {
     document.body.classList.add('expanded');
-    this.collapseTimer_ = setTimeout(this.setExpanded_.bind(false), 2000);
+    this.collapseTimer_ = setTimeout(this.setExpanded_.bind(this, false), 2000);
+    this.expandingOrCollapsing_ = true;
+    this.expandingTimer_ = setTimeout(function() {
+      this.expanded_ = true;
+      this.expandingOrCollapsing_ = false;
+    }.bind(this), 250);
   } else {
     document.body.classList.remove('expanded');
-  }
+    this.expanded_ = false;
+    this.expandingOrCollapsing_ = true;
+    this.collapsingTimer_ = setTimeout(function() {
+      this.expandingOrCollapsing_ = false;
+    }.bind(this), 250);
+   }
 };
 
 camera.Camera.prototype.takePicture_ = function() {
-  // Show flashing animation.
+  // Take the picture and save to disk.
+  // TODO(mtomasz): To be implemented.
+
+  this.mainProcessor_.processFrame();
+  var dataURL = this.mainCanvas_.toDataURL('image/jpeg');
+
+  // Create a picture preview animation.
+  var picturePreview = document.querySelector('#picture-preview');
+  picturePreview.textContent = '';
+  var img = document.createElement('img');
+  img.src = dataURL;
+  img.style.webkitTransform = 'rotate(' + (Math.random() * 60 - 30) + 'deg)';
+  picturePreview.appendChild(img);
+
+  // Show flashing animation with the shutter sound.
   document.body.classList.add('show-shutter');
   setTimeout(function() {
     document.body.classList.remove('show-shutter');
-  }, 100);
-
-  // Take the picture and save to disk.
-  // TODO(mtomasz): To be implemented.
+  }, 200);
+  this.shutterSound_.currentTime = 0;
+  this.shutterSound_.play();
 };
 
 /**
@@ -283,13 +346,27 @@ camera.Camera.prototype.synchronizeBounds_ = function() {
  */
 camera.Camera.prototype.start = function() {
   var index = 0;
+  
+  var onSuccess = function() {
+    chrome.app.window.current().show();
+    // Show tools after some small delay to make it more visible.
+    setTimeout(this.setExpanded_.bind(this, true), 500);
+  }.bind(this);
+
+  var onFailure = function() {
+    chrome.app.window.current().show();
+    // TODO(mtomasz): Show an error message.
+  };
+
   var tryNextResolution = function() {
     this.startWithResolution_(camera.Camera.RESOLUTIONS[index],
-                              function() {},  // Success callback.
+                              onSuccess,
                               function() {
                                 index++;
                                 if (index < camera.Camera.RESOLUTIONS.length)
                                   tryNextResolution();
+                                else
+                                  onFailure();
                               });
   }.bind(this);
 
@@ -311,16 +388,19 @@ camera.Camera.prototype.drawFrame_ = function() {
   // context.restore();
 
   // Process effect preview canvases.
-  if (this.frame_ % 2 == 0 && document.body.classList.contains('expanded')) {
+  if (this.frame_ % 3 == 0 && this.expanded_) {
     for (var index = 0; index < this.previewProcessors_.length; index++) {
       this.previewProcessors_[index].processFrame();
     }
   }
   this.frame_++;
 
-  // Process the full resolution frame.
-  var mainContext = this.mainCanvas_.getContext('2d');
-  this.mainProcessor_.processFrame();
+  // Process the full resolution frame. Decrease FPS when expanding for smooth
+  // animations.
+  if (this.frame_ % 3 == 0 || !this.expandingOrCollapsing_) {
+    var mainContext = this.mainCanvas_.getContext('2d');
+    this.mainProcessor_.processFrame();
+  }
 };
 
 /**
@@ -328,7 +408,4 @@ camera.Camera.prototype.drawFrame_ = function() {
  */
 document.addEventListener('DOMContentLoaded', function() {
   camera.Camera.getInstance().start();
-
-  // Show the current window, since the DOM is already loaded.
-  chrome.app.window.current().show();
 });
