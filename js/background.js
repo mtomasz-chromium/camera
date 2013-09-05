@@ -19,14 +19,14 @@ camera.bg.appWindow = null;
  * @type {number}
  * @const
  */
-camera.bg.DEFAULT_WIDTH = 800;
+camera.bg.DEFAULT_WIDTH = 1280;
 
 /**
  * Default height of the window in pixels.
  * @type {number}
  * @const
  */
-camera.bg.DEFAULT_HEIGHT = 600;
+camera.bg.DEFAULT_HEIGHT = 720;
 
 /**
  * Creates the window. Note, that only one window at once is supported.

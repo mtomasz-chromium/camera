@@ -73,6 +73,7 @@ camera.Camera = function() {
 
   this.expanded_ = false;
   this.expandingOrCollapsing_ = false;
+  this.taking_ = false;
 
   this.collapseTimer_ = null;
   this.collapsingTimer_ = null;
@@ -118,6 +119,12 @@ camera.Camera = function() {
   document.querySelector('#effects').addEventListener(
       'mousemove', this.onRibbonMouseMove_.bind(this));
 
+  // Handle window decoration buttons.
+  document.querySelector('#maximize').addEventListener('click',
+      this.onMaximizeClicked_.bind(this));
+  document.querySelector('#close').addEventListener('click',
+      this.onCloseClicked_.bind(this));
+
   // Load the shutter sound.
   this.shutterSound_.src = '../sounds/shutter.wav';
 };
@@ -128,7 +135,10 @@ camera.Camera.prototype.addEffect_ = function(effect) {
   var wrapper = document.createElement('div');
   wrapper.className = 'preview-canvas-wrapper';
   var canvas = fx.canvas();
-  wrapper.appendChild(canvas);
+  var padder = document.createElement('div');
+  padder.className = 'preview-canvas-padder';
+  padder.appendChild(canvas);
+  wrapper.appendChild(padder);
   var item = document.createElement('li');
   item.appendChild(wrapper);
   list.appendChild(item);
@@ -195,6 +205,17 @@ camera.Camera.prototype.onRibbonMouseMove_ = function(event) {
   ribbon.scrollLeft = parseInt(ribbon.scrollLeft) - event.webkitMovementX;
 };
 
+camera.Camera.prototype.onMaximizeClicked_ = function(event) {
+  if (chrome.app.window.current().isMaximized())
+    chrome.app.window.current().restore();
+  else
+    chrome.app.window.current().maximize();
+};
+
+camera.Camera.prototype.onCloseClicked_ = function(event) {
+  chrome.app.window.current().close();
+};
+
 camera.Camera.prototype.setExpanded_ = function(expanded) {
   if (this.collapseTimer_) {
     clearTimeout(this.collapseTimer_);
@@ -227,27 +248,34 @@ camera.Camera.prototype.setExpanded_ = function(expanded) {
 };
 
 camera.Camera.prototype.takePicture_ = function() {
+  // Lock refreshing for smoother experience.
+  this.taking_ = true;
+
   // Take the picture and save to disk.
   // TODO(mtomasz): To be implemented.
-
-  this.mainProcessor_.processFrame();
-  var dataURL = this.mainCanvas_.toDataURL('image/jpeg');
-
-  // Create a picture preview animation.
-  var picturePreview = document.querySelector('#picture-preview');
-  picturePreview.textContent = '';
-  var img = document.createElement('img');
-  img.src = dataURL;
-  img.style.webkitTransform = 'rotate(' + (Math.random() * 60 - 30) + 'deg)';
-  picturePreview.appendChild(img);
 
   // Show flashing animation with the shutter sound.
   document.body.classList.add('show-shutter');
   setTimeout(function() {
     document.body.classList.remove('show-shutter');
-  }, 200);
+    this.taking_ = false;
+  }.bind(this), 200);
+
   this.shutterSound_.currentTime = 0;
   this.shutterSound_.play();
+
+  setTimeout(function() {
+    this.mainProcessor_.processFrame();
+    var dataURL = this.mainCanvas_.toDataURL('image/jpeg');
+
+    // Create a picture preview animation.
+    var picturePreview = document.querySelector('#picture-preview');
+    picturePreview.textContent = '';
+    var img = document.createElement('img');
+    img.src = dataURL;
+    img.style.webkitTransform = 'rotate(' + (Math.random() * 60 - 30) + 'deg)';
+    picturePreview.appendChild(img);
+  }.bind(this), 0);
 };
 
 /**
@@ -309,7 +337,8 @@ camera.Camera.prototype.synchronizeBounds_ = function() {
  *
  * @param {Array} resolution Width and height of the capturing mode, eg.
  *     [800, 600].
- * @param {function()} onSuccess Success callback.
+ * @param {function(number, number)} onSuccess Success callback with the set
+ *                                   resolution.
  * @param {function()} onFailure Failure callback, eg. the resolution is
  *                     not supported.
  * @private
@@ -335,7 +364,7 @@ camera.Camera.prototype.synchronizeBounds_ = function() {
       requestAnimationFrame(onAnimationFrame);
     }.bind(this);
     onAnimationFrame();
-    onSuccess();
+    onSuccess(resolution[0], resolution[1]);
   }.bind(this), function(error) {
     onFailure();
   });
@@ -347,7 +376,16 @@ camera.Camera.prototype.synchronizeBounds_ = function() {
 camera.Camera.prototype.start = function() {
   var index = 0;
   
-  var onSuccess = function() {
+  var onSuccess = function(width, height) {
+    // If the window dimensions are default (set to HD), and the established
+    // camera resolution is different (not HD), then adjust the window size
+    // to the camera resolution.
+    var windowWidth = document.body.offsetWidth;
+    var windowHeight = document.body.offsetHeight;
+    if (windowWidth == 1024 && windowHeigth == 768 &&
+        width * windowHeight !=  height * windowWidth) {
+      chrome.app.window.current().resizeTo(width, height);
+    }
     chrome.app.window.current().show();
     // Show tools after some small delay to make it more visible.
     setTimeout(this.setExpanded_.bind(this, true), 500);
@@ -374,6 +412,9 @@ camera.Camera.prototype.start = function() {
 };
 
 camera.Camera.prototype.drawFrame_ = function() {
+  if (this.taking_)
+    return;
+
   // Copy the video frame to the back buffer. The back buffer is low resolution,
   // since it is only used by preview windows.
   var context = this.previewInputCanvas_.getContext('2d');
