@@ -27,7 +27,7 @@ camera.effects.Newspaper.prototype.randomize = function() {
 };
 
 camera.effects.Newspaper.prototype.filterFrame = function(canvas) {
-  canvas.dotScreen(320, 239.5, 1.1, this.amount_);
+  canvas.dotScreen(320, 239.5, 1.1, this.amount_ / 720 * canvas.height);
 };
 
 camera.effects.Newspaper.prototype.getTitle = function() {

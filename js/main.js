@@ -31,25 +31,40 @@ camera.Camera = function() {
    */
   this.previewInputCanvas_ = document.createElement('canvas');
 
-  /**
+ /**
    * @type {boolean}
    * @private
    */
   this.running_ = false;
 
   /**
-   * The main (full screen) canvas.
+   * The main (full screen) canvas for full quality capture.
    * @type {fx.Canvas}
    * @private
    */
   this.mainCanvas_ = fx.canvas();
 
   /**
-   * The main (full screen) processor.
+   * The main (full screen canvas) for fast capture.
+   * @type {fx.Canvas}
+   * @private
+   */
+  this.mainFastCanvas_ = fx.canvas();
+
+  /**
+   * The main (full screen) processor in the full quality mode.
    * @type {camera.Processor}
    * @private
    */
   this.mainProcessor_ = new camera.Processor(this.video_, this.mainCanvas_);
+
+  /**
+   * The main (full screen) processor in the fast mode.
+   * @type {camera.Processor}
+   * @private
+   */
+  this.mainFastProcessor_ = new camera.Processor(
+      this.video_, this.mainFastCanvas_, camera.Processor.Mode.FAST);
 
   /**
    * Processors for effect previews.
@@ -71,6 +86,7 @@ camera.Camera = function() {
    */
   this.frame_ = 0;
 
+  this.gallery_ = false;
   this.expanded_ = false;
   this.expandingOrCollapsing_ = false;
   this.taking_ = false;
@@ -80,8 +96,9 @@ camera.Camera = function() {
   this.expandingTimer_ = null;
 
   // Insert the main canvas to its container.
-  this.mainCanvas_.id = 'canvas';
-  document.querySelector('#canvas-wrapper').appendChild(this.mainCanvas_);
+  document.querySelector('#main-canvas-wrapper').appendChild(this.mainCanvas_);
+  document.querySelector('#main-fast-canvas-wrapper').appendChild(
+      this.mainFastCanvas_);
 
   // Set the default effect.
   this.mainProcessor_.effect = new camera.effects.Swirl();
@@ -95,6 +112,7 @@ camera.Camera = function() {
 
   // Prepare effect previews.
   this.addEffect_(new camera.effects.Normal());
+  this.addEffect_(new camera.effects.Vintage());
   this.addEffect_(new camera.effects.Andy());
   this.addEffect_(new camera.effects.Swirl());
   this.addEffect_(new camera.effects.Pinch());
@@ -103,7 +121,6 @@ camera.Camera = function() {
   this.addEffect_(new camera.effects.Colorize());
   this.addEffect_(new camera.effects.Newspaper());
   this.addEffect_(new camera.effects.TiltShift());
-  this.addEffect_(new camera.effects.Vintage());
 
   // Select the default effect.
   this.setCurrentEffect_(0);
@@ -115,7 +132,7 @@ camera.Camera = function() {
   document.body.addEventListener(
       'mousemove', this.setExpanded_.bind(this, true));
   document.body.addEventListener(
-      'toucmove', this.setExpanded_.bind(this, true));
+      'touchmove', this.setExpanded_.bind(this, true));
   document.body.addEventListener(
       'click', this.setExpanded_.bind(this, true));
 
@@ -124,9 +141,11 @@ camera.Camera = function() {
       'mousemove', this.onRibbonMouseMove_.bind(this));
 
   // Handle window decoration buttons.
-  document.querySelector('#maximize').addEventListener('click',
+  document.querySelector('#gallery-button').addEventListener('click',
+      this.onGalleryClicked_.bind(this));
+  document.querySelector('#maximize-button').addEventListener('click',
       this.onMaximizeClicked_.bind(this));
-  document.querySelector('#close').addEventListener('click',
+  document.querySelector('#close-button').addEventListener('click',
       this.onCloseClicked_.bind(this));
 
   // Handle the 'Take' button.
@@ -177,30 +196,40 @@ camera.Camera.prototype.setCurrentEffect_ = function(effectIndex) {
   if (this.currentEffectIndex_ == effectIndex)
     this.previewProcessors_[effectIndex].effect.randomize();
   this.mainProcessor_.effect = this.previewProcessors_[effectIndex].effect;
+  this.mainFastProcessor_.effect = this.previewProcessors_[effectIndex].effect;
   this.currentEffectIndex_ = effectIndex;
 };
 
 camera.Camera.prototype.onKeyPressed_ = function(event) {
-  switch (event.keyIdentifier) {
-    case 'Left':
-      this.setCurrentEffect_(
-          (this.currentEffectIndex_ + this.previewProcessors_.length - 1) %
-              this.previewProcessors_.length);
-      break;
-    case 'Right':
-      this.setCurrentEffect_(
-          (this.currentEffectIndex_ + 1) % this.previewProcessors_.length);
-      break;
-    case 'Home':
-      this.setCurrentEffect_(0);
-      break;
-    case 'End':
-      this.setCurrentEffect_(this.previewProcessors_.length - 1);
-      break;
-    case 'Enter':
-    case 'U+0020':
-      this.takePicture_();
-      break;
+  // Force forucs on the ribbon.
+  document.querySelector('#effects').focus();
+
+  if (!this.gallery_) {
+    switch (event.keyIdentifier) {  // TODO(mtomasz): To be implemented.
+      case 'Left':
+        this.setCurrentEffect_(
+            (this.currentEffectIndex_ + this.previewProcessors_.length - 1) %
+                this.previewProcessors_.length);
+        break;
+      case 'Right':
+        this.setCurrentEffect_(
+            (this.currentEffectIndex_ + 1) % this.previewProcessors_.length);
+        break;
+      case 'Home':
+        this.setCurrentEffect_(0);
+        break;
+      case 'End':
+        this.setCurrentEffect_(this.previewProcessors_.length - 1);
+        break;
+      case 'Enter':
+      case 'U+0020':
+        this.takePicture_();
+        event.stopPropagation();
+        event.preventDefault();
+        break;
+    }
+  } else {
+    // TODO(mtomasz): To be implemented.
   }
 };
 
@@ -209,6 +238,16 @@ camera.Camera.prototype.onRibbonMouseMove_ = function(event) {
     return;
   var ribbon = document.querySelector('#effects');
   ribbon.scrollLeft = parseInt(ribbon.scrollLeft) - event.webkitMovementX;
+};
+
+camera.Camera.prototype.onGalleryClicked_ = function(event) {
+  if (this.gallery_) {
+    document.body.classList.remove('gallery');
+    this.gallery_ = false;
+  } else {
+    document.body.classList.add('gallery');
+    this.gallery_ = true;
+  }
 };
 
 camera.Camera.prototype.onMaximizeClicked_ = function(event) {
@@ -238,19 +277,23 @@ camera.Camera.prototype.setExpanded_ = function(expanded) {
   if (expanded) {
     document.body.classList.add('expanded');
     this.collapseTimer_ = setTimeout(this.setExpanded_.bind(this, false), 2000);
-    this.expandingOrCollapsing_ = true;
-    this.expandingTimer_ = setTimeout(function() {
-      this.expanded_ = true;
-      this.expandingOrCollapsing_ = false;
-    }.bind(this), 250);
+    if (!this.expanded_) {
+      this.expandingOrCollapsing_ = true;
+      this.expandingTimer_ = setTimeout(function() {
+        this.expanded_ = true;
+        this.expandingOrCollapsing_ = false;
+      }.bind(this), 500);
+    }
   } else {
     document.body.classList.remove('expanded');
-    this.expanded_ = false;
-    this.expandingOrCollapsing_ = true;
-    this.collapsingTimer_ = setTimeout(function() {
-      this.expandingOrCollapsing_ = false;
-    }.bind(this), 250);
-   }
+    if (this.expanded_) {
+      this.expanded_ = false;
+      this.expandingOrCollapsing_ = true;
+      this.collapsingTimer_ = setTimeout(function() {
+        this.expandingOrCollapsing_ = false;
+      }.bind(this), 500);
+    }
+  }
 };
 
 camera.Camera.prototype.takePicture_ = function() {
@@ -259,9 +302,10 @@ camera.Camera.prototype.takePicture_ = function() {
 
   // Show flashing animation with the shutter sound.
   document.body.classList.add('show-shutter');
+  var galleryButton = document.querySelector('#gallery-button');
+  camera.util.setAnimationClass(galleryButton, galleryButton, 'flash');
   setTimeout(function() {
     document.body.classList.remove('show-shutter');
-    this.taking_ = false;
   }.bind(this), 200);
 
   this.shutterSound_.currentTime = 0;
@@ -271,10 +315,30 @@ camera.Camera.prototype.takePicture_ = function() {
     this.mainProcessor_.processFrame();
     var dataURL = this.mainCanvas_.toDataURL('image/jpeg');
 
+    var onError = function(opt_error) {
+      console.log(opt_error);
+    }.bind(this);
+    
     // Take the picture and save to disk.
-    var base64string = dataURL.substring(dataURL.indexOf(',') + 1);
-    var data = atob(base64string);
-    console.log(data);
+    if (this.fileSystem_) {
+      var dateFormatter = Intl.DateTimeFormat(
+          [] /* default locale */,
+          {year: 'numeric', month: 'short', day: 'numeric'});
+      var base64string = dataURL.substring(dataURL.indexOf(',') + 1);
+      var data = atob(base64string);
+      this.fileSystem_.root.getDirectory(
+          '/drive/root/Camera Pictures', {create: true}, function(dirEntry) {
+            var fileName = dateFormatter(new Date()) + '.jpeg';
+            dirEntry.getFile(fileName, {create: true}, function(fileEntry) {
+              fileEntry.createWriter(function(fileWriter) {
+                var blob = new Blob(data, {type: 'image/jpeg'});
+                fileWriter.write(blob);
+              }.bind(this), onError);
+            }.bind(this), onError);
+          }.bind(this), onError);
+    } else {
+      onError();
+    }
 
     // Create a picture preview animation.
     var picturePreview = document.querySelector('#picture-preview');
@@ -283,7 +347,17 @@ camera.Camera.prototype.takePicture_ = function() {
     img.src = dataURL;
     img.style.webkitTransform = 'rotate(' + (Math.random() * 60 - 30) + 'deg)';
     picturePreview.appendChild(img);
-  }.bind(this), 0);
+    camera.util.waitForAnimationCompletion(img, function() {
+      img.parentNode.removeChild(img);
+     this.taking_ = false;
+    }.bind(this));
+
+    // Add the picture to the gallery.
+    var gallery = document.querySelector('#gallery');
+    var img2 = document.createElement('img');
+    img2.src = dataURL;
+    gallery.appendChild(img2);
+   }.bind(this), 0);
 };
 
 /**
@@ -420,7 +494,8 @@ camera.Camera.prototype.start = function() {
 };
 
 camera.Camera.prototype.drawFrame_ = function() {
-  if (this.taking_)
+  // No capturing when the gallery is opened.
+  if (this.gallery_)
     return;
 
   // Copy the video frame to the back buffer. The back buffer is low resolution,
@@ -437,7 +512,7 @@ camera.Camera.prototype.drawFrame_ = function() {
   // context.restore();
 
   // Process effect preview canvases.
-  if (this.frame_ % 3 == 0 && this.expanded_) {
+  if (this.frame_ % 3 == 0 && this.expanded_ && !this.taking_) {
     for (var index = 0; index < this.previewProcessors_.length; index++) {
       this.previewProcessors_[index].processFrame();
     }
@@ -446,10 +521,15 @@ camera.Camera.prototype.drawFrame_ = function() {
 
   // Process the full resolution frame. Decrease FPS when expanding for smooth
   // animations.
-  if (this.frame_ % 3 == 0 || !this.expandingOrCollapsing_) {
-    var mainContext = this.mainCanvas_.getContext('2d');
+  if (this.taking_ || this.expandingOrCollapsing_) {
+    this.mainFastProcessor_.processFrame();
+    this.mainCanvas_.parentNode.hidden = true;
+    this.mainFastCanvas_.parentNode.hidden = false;
+  } else {
     this.mainProcessor_.processFrame();
-  }
+    this.mainCanvas_.parentNode.hidden = false;
+    this.mainFastCanvas_.parentNode.hidden = true;
+   }
 };
 
 /**
