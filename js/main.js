@@ -110,8 +110,12 @@ camera.Camera = function() {
 
   // Handle key presses to make the Camera app accessible via the keyboard.
   document.body.addEventListener('keydown', this.onKeyPressed_.bind(this));
+  
+  // Show tools on touch or mouse move/click.
   document.body.addEventListener(
       'mousemove', this.setExpanded_.bind(this, true));
+  document.body.addEventListener(
+      'toucmove', this.setExpanded_.bind(this, true));
   document.body.addEventListener(
       'click', this.setExpanded_.bind(this, true));
 
@@ -124,6 +128,10 @@ camera.Camera = function() {
       this.onMaximizeClicked_.bind(this));
   document.querySelector('#close').addEventListener('click',
       this.onCloseClicked_.bind(this));
+
+  // Handle the 'Take' button.
+  document.querySelector('#take-picture').addEventListener(
+      'click', this.takePicture_.bind(this));
 
   // Load the shutter sound.
   this.shutterSound_.src = '../sounds/shutter.wav';
@@ -153,8 +161,6 @@ camera.Camera.prototype.addEffect_ = function(effect) {
   // Assign events.
   item.addEventListener('click',
       this.setCurrentEffect_.bind(this, effectIndex));
-  document.querySelector('#take-picture').addEventListener(
-      'click', this.takePicture_.bind(this));
 
   // Create the preview processor.
   var processor = new camera.Processor(
@@ -251,9 +257,6 @@ camera.Camera.prototype.takePicture_ = function() {
   // Lock refreshing for smoother experience.
   this.taking_ = true;
 
-  // Take the picture and save to disk.
-  // TODO(mtomasz): To be implemented.
-
   // Show flashing animation with the shutter sound.
   document.body.classList.add('show-shutter');
   setTimeout(function() {
@@ -267,6 +270,11 @@ camera.Camera.prototype.takePicture_ = function() {
   setTimeout(function() {
     this.mainProcessor_.processFrame();
     var dataURL = this.mainCanvas_.toDataURL('image/jpeg');
+
+    // Take the picture and save to disk.
+    var base64string = dataURL.substring(dataURL.indexOf(',') + 1);
+    var data = atob(base64string);
+    console.log(data);
 
     // Create a picture preview animation.
     var picturePreview = document.querySelector('#picture-preview');
